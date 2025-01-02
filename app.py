@@ -32,13 +32,14 @@ def load_data(url):
 # Function to add a row
 def add_row_to_data(data, timestamp, temperature, ac_status, fan_status):
     """Adds a new row to the dataset."""
-    new_row = {
-        "Timestamp": pd.to_datetime(timestamp),
-        "Temperature": float(temperature),
-        "AC_Status": int(ac_status),
-        "Fan_Status": int(fan_status)
-    }
-    return data.append(new_row, ignore_index=True)
+    new_row = pd.DataFrame({
+        "Timestamp": [pd.to_datetime(timestamp)],
+        "Temperature": [float(temperature)],
+        "AC_Status": [int(ac_status)],
+        "Fan_Status": [int(fan_status)]
+    })
+    return pd.concat([data, new_row], ignore_index=True)
+
 
 # Load the data
 data = load_data(github_repo)
