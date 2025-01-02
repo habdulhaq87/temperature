@@ -12,7 +12,7 @@ st.set_page_config(
 )
 
 # GitHub raw URL for the CSV file
-github_repo = "https://raw.githubusercontent.com/<your-username>/<your-repository>/main/Hourly_Temperature_Readings.csv"
+github_repo = "https://raw.githubusercontent.com/habdulhaq87/temperature/main/Hourly_Temperature_Readings_Dataset.csv"
 
 @st.cache_data
 def load_data(url):
