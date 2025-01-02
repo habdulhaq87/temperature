@@ -13,6 +13,7 @@ st.set_page_config(
 
 # GitHub raw URL for the CSV file
 github_repo = "https://raw.githubusercontent.com/habdulhaq87/temperature/main/Hourly_Temperature_Readings_Dataset.csv"
+local_file = "Hourly_Temperature_Readings_Dataset.csv"  # Local copy for updates
 
 @st.cache_data
 def load_data(url):
@@ -27,41 +28,89 @@ def load_data(url):
         st.error(f"Failed to load data from GitHub: {e}")
         return None
 
+# Function to add a row
+def add_row_to_data(data, timestamp, temperature, ac_status, fan_status):
+    """Adds a new row to the dataset."""
+    new_row = {
+        "Timestamp": pd.to_datetime(timestamp),
+        "Temperature": float(temperature),
+        "AC_Status": int(ac_status),
+        "Fan_Status": int(fan_status)
+    }
+    return data.append(new_row, ignore_index=True)
+
 # Load the data
 data = load_data(github_repo)
 
-if data is not None:
-    # Sidebar controls and filters
-    start_date, end_date, view_ac_status, view_fan_status, temp_min, temp_max = render_filters(data)
+# Main application with multiple pages
+st.sidebar.title("Navigation")
+page = st.sidebar.radio("Go to", ["Analysis", "Input Data"])
 
-    # Apply filters
-    filtered_data = data[(data['Timestamp'].dt.date >= start_date) & (data['Timestamp'].dt.date <= end_date)]
-    if view_ac_status:
-        filtered_data = filtered_data[filtered_data['AC_Status'] == 1]
-    if view_fan_status:
-        filtered_data = filtered_data[filtered_data['Fan_Status'] == 1]
-    filtered_data = filtered_data[(filtered_data['Temperature'] >= temp_min) & (filtered_data['Temperature'] <= temp_max)]
+if page == "Analysis":
+    if data is not None:
+        # Sidebar controls and filters
+        start_date, end_date, view_ac_status, view_fan_status, temp_min, temp_max = render_filters(data)
 
-    # Main content
-    st.title("Hourly Temperature Analysis")
+        # Apply filters
+        filtered_data = data[(data['Timestamp'].dt.date >= start_date) & (data['Timestamp'].dt.date <= end_date)]
+        if view_ac_status:
+            filtered_data = filtered_data[filtered_data['AC_Status'] == 1]
+        if view_fan_status:
+            filtered_data = filtered_data[filtered_data['Fan_Status'] == 1]
+        filtered_data = filtered_data[(filtered_data['Temperature'] >= temp_min) & (filtered_data['Temperature'] <= temp_max)]
+
+        # Main content
+        st.title("Hourly Temperature Analysis")
+        st.markdown("""
+        This application provides an in-depth analysis of hourly temperature readings, including interactive visualizations, statistics, and dataset exploration.
+        """)
+
+        # Render components
+        render_statistics(filtered_data)
+        render_temperature_chart(filtered_data)
+        render_filtered_dataset(filtered_data)
+
+        # Download option
+        st.download_button(
+            label="Download Filtered Dataset",
+            data=filtered_data.to_csv(index=False),
+            file_name="filtered_temperature_data.csv",
+            mime="text/csv"
+        )
+
+        # Notify about updates
+        st.info("Note: If you add new rows using the input page, refresh the app to see the updated dataset.")
+    else:
+        st.error("Unable to load the dataset. Please check the GitHub repository URL.")
+
+elif page == "Input Data":
+    st.title("Input Data")
     st.markdown("""
-    This application provides an in-depth analysis of hourly temperature readings, including interactive visualizations, statistics, and dataset exploration.
+    Use this page to manually add new rows to the dataset. The changes will be applied to the local dataset.
     """)
 
-    # Render components
-    render_statistics(filtered_data)
-    render_temperature_chart(filtered_data)
-    render_filtered_dataset(filtered_data)
+    if data is not None:
+        # Input fields
+        timestamp = st.text_input("Timestamp (YYYY-MM-DD HH:MM:SS)", "")
+        temperature = st.number_input("Temperature (°C)", min_value=-50.0, max_value=50.0, step=0.1)
+        ac_status = st.selectbox("AC Status", options=[1, 0], format_func=lambda x: "ON" if x == 1 else "OFF")
+        fan_status = st.selectbox("Fan Status", options=[1, 0], format_func=lambda x: "ON" if x == 1 else "OFF")
 
-    # Download option
-    st.download_button(
-        label="Download Filtered Dataset",
-        data=filtered_data.to_csv(index=False),
-        file_name="filtered_temperature_data.csv",
-        mime="text/csv"
-    )
+        if st.button("Add Row"):
+            if timestamp:
+                try:
+                    # Add the new row
+                    data = add_row_to_data(data, timestamp, temperature, ac_status, fan_status)
+                    # Save the updated dataset locally
+                    data.to_csv(local_file, index=False)
+                    st.success("Row added successfully!")
+                except Exception as e:
+                    st.error(f"Failed to add row: {e}")
+            else:
+                st.error("Timestamp cannot be empty.")
 
-    # Notify about updates
-    st.info("Note: If you add new rows using the input script, refresh the page to see the updated dataset.")
-else:
-    st.error("Unable to load the dataset. Please check the GitHub repository URL.")
+        # Show the updated dataset
+        st.subheader("Updated Dataset Preview")
+        st.dataframe(data.tail(10))  # Show last 10 rows
+    else:
+        st.error("Unable to load the dataset. Please check the GitHub repository URL.")
