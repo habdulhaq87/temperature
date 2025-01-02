@@ -1,44 +1,54 @@
 import pandas as pd
-from datetime import datetime
-import os
+import requests
+from io import StringIO
 
-DATABASE_PATH = "Hourly_Temperature_Readings_Dataset.csv"
+# GitHub raw URL for the CSV file
+github_repo = "https://raw.githubusercontent.com/habdulhaq87/temperature/main/Hourly_Temperature_Readings_Dataset.csv"
+local_file = "Hourly_Temperature_Readings_Dataset.csv"  # Local copy
 
-def update_database(new_data):
-    """
-    Updates the existing database with new data.
+def load_existing_data(url):
+    """Loads the existing dataset from GitHub."""
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        csv_data = StringIO(response.text)
+        data = pd.read_csv(csv_data)
+        data['Timestamp'] = pd.to_datetime(data['Timestamp'])  # Ensure Timestamp is datetime
+        return data
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to load data from GitHub: {e}")
+        return pd.DataFrame()
 
-    Args:
-        new_data (pd.DataFrame): The new data to be added.
-    """
-    if os.path.exists(DATABASE_PATH):
-        # Load existing data
-        existing_data = pd.read_csv(DATABASE_PATH)
-        existing_data['Timestamp'] = pd.to_datetime(existing_data['Timestamp'])
-    else:
-        # Initialize an empty DataFrame if database doesn't exist
-        existing_data = pd.DataFrame(columns=["Timestamp", "Temperature", "AC_Status", "Fan_Status"])
+def add_row(data, timestamp, temperature, ac_status, fan_status):
+    """Adds a new row to the dataset."""
+    new_row = {
+        "Timestamp": pd.to_datetime(timestamp),
+        "Temperature": float(temperature),
+        "AC_Status": int(ac_status),
+        "Fan_Status": int(fan_status)
+    }
+    return data.append(new_row, ignore_index=True)
 
-    # Ensure timestamps are datetime objects in new data
-    new_data['Timestamp'] = pd.to_datetime(new_data['Timestamp'])
+def save_updated_data(data, file_path):
+    """Saves the updated dataset locally."""
+    data.to_csv(file_path, index=False)
+    print(f"Updated dataset saved to {file_path}")
 
-    # Combine datasets and remove duplicates
-    combined_data = pd.concat([existing_data, new_data]).drop_duplicates(subset="Timestamp").sort_values(by="Timestamp")
+# Load existing data
+data = load_existing_data(github_repo)
 
-    # Save the updated database
-    combined_data.to_csv(DATABASE_PATH, index=False)
-    print(f"Database updated successfully! Total records: {len(combined_data)}")
+# Input new data row
+if not data.empty:
+    print("Existing dataset loaded. Add a new row.")
+    timestamp = input("Enter Timestamp (YYYY-MM-DD HH:MM:SS): ")
+    temperature = input("Enter Temperature (°C): ")
+    ac_status = input("Enter AC Status (1 for ON, 0 for OFF): ")
+    fan_status = input("Enter Fan Status (1 for ON, 0 for OFF): ")
 
-def create_sample_data():
-    """Creates sample new data for testing purposes."""
-    new_data = pd.DataFrame({
-        "Timestamp": [datetime(2025, 1, 3, hour) for hour in range(24)],
-        "Temperature": [22 + i % 3 for i in range(24)],  # Simulated temperatures
-        "AC_Status": [1 if i % 2 == 0 else 0 for i in range(24)],
-        "Fan_Status": [0 if i % 2 == 0 else 1 for i in range(24)]
-    })
-    return new_data
+    # Add new row
+    data = add_row(data, timestamp, temperature, ac_status, fan_status)
 
-if __name__ == "__main__":
-    sample_data = create_sample_data()
-    update_database(sample_data)
+    # Save updated data locally
+    save_updated_data(data, local_file)
+else:
+    print("Failed to load existing dataset. No changes made.")
