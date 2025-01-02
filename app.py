@@ -17,6 +17,7 @@ local_file = "Hourly_Temperature_Readings_Dataset.csv"  # Local copy for updates
 
 @st.cache_data
 def load_data(url):
+    """Fetch the dataset from GitHub."""
     try:
         response = requests.get(url)
         response.raise_for_status()
@@ -90,24 +91,38 @@ elif page == "Input Data":
     """)
 
     if data is not None:
-        # Input fields
-        timestamp = st.text_input("Timestamp (YYYY-MM-DD HH:MM:SS)", "")
-        temperature = st.number_input("Temperature (°C)", min_value=-50.0, max_value=50.0, step=0.1)
-        ac_status = st.selectbox("AC Status", options=[1, 0], format_func=lambda x: "ON" if x == 1 else "OFF")
-        fan_status = st.selectbox("Fan Status", options=[1, 0], format_func=lambda x: "ON" if x == 1 else "OFF")
+        # Timestamp selection using date and time input
+        col1, col2 = st.columns(2)
+        with col1:
+            date = st.date_input("Select Date")
+        with col2:
+            time = st.time_input("Select Time")
+        timestamp = pd.Timestamp.combine(date, time)
 
+        # Temperature control using slider
+        temperature = st.slider(
+            "Temperature (°C)", 
+            min_value=-50.0, 
+            max_value=50.0, 
+            value=25.0, 
+            step=0.1
+        )
+
+        # AC and Fan status using toggle buttons
+        col3, col4 = st.columns(2)
+        with col3:
+            ac_status = st.radio("AC Status", options=[1, 0], format_func=lambda x: "ON" if x == 1 else "OFF")
+        with col4:
+            fan_status = st.radio("Fan Status", options=[1, 0], format_func=lambda x: "ON" if x == 1 else "OFF")
+
+        # Add row to the dataset
         if st.button("Add Row"):
-            if timestamp:
-                try:
-                    # Add the new row
-                    data = add_row_to_data(data, timestamp, temperature, ac_status, fan_status)
-                    # Save the updated dataset locally
-                    data.to_csv(local_file, index=False)
-                    st.success("Row added successfully!")
-                except Exception as e:
-                    st.error(f"Failed to add row: {e}")
-            else:
-                st.error("Timestamp cannot be empty.")
+            try:
+                data = add_row_to_data(data, timestamp, temperature, ac_status, fan_status)
+                data.to_csv(local_file, index=False)
+                st.success("Row added successfully!")
+            except Exception as e:
+                st.error(f"Failed to add row: {e}")
 
         # Show the updated dataset
         st.subheader("Updated Dataset Preview")
