@@ -3,6 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import requests
 from io import StringIO
+from streamlit_lottie import st_lottie
+import json
 
 # Set page configuration
 st.set_page_config(
@@ -27,8 +29,16 @@ def load_data(url):
         st.error(f"Failed to load data from GitHub: {e}")
         return None
 
+@st.cache_data
+def load_lottie_file(filepath):
+    with open(filepath, "r") as f:
+        return json.load(f)
+
 # Load the data
 data = load_data(github_repo)
+
+# Load a Lottie animation for better UI
+temperature_animation = load_lottie_file("assets/temperature.json")
 
 if data is not None:
     # Sidebar filters
@@ -43,10 +53,13 @@ if data is not None:
         filtered_data = filtered_data[filtered_data['AC_Status'] == 1]
 
     # Main content
-    st.title("Hourly Temperature Visualization")
+    st.title("Hourly Temperature Visualization 🌡️")
     st.markdown(
         "This app visualizes hourly temperature readings along with AC and fan statuses."
     )
+
+    # Add Lottie animation
+    st_lottie(temperature_animation, height=200, key="temp")
 
     # Line chart for temperature over time
     st.subheader("Temperature Over Time")
@@ -62,5 +75,12 @@ if data is not None:
     # Data table
     st.subheader("Filtered Data Table")
     st.dataframe(filtered_data, use_container_width=True)
+
+    # Summary section
+    st.subheader("Summary")
+    avg_temp = filtered_data['Temperature'].mean()
+    ac_on_count = filtered_data['AC_Status'].sum()
+    st.write(f"Average Temperature: {avg_temp:.2f} °C")
+    st.write(f"Number of Times AC was ON: {ac_on_count}")
 else:
     st.error("Unable to load the dataset. Please check the GitHub repository URL.")
