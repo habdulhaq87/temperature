@@ -3,12 +3,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import requests
 from io import StringIO
-from streamlit_lottie import st_lottie
-import json
 
 # Set page configuration
 st.set_page_config(
-    page_title="Hourly Temperature Visualization",
+    page_title="Hourly Temperature Analysis",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -29,16 +27,8 @@ def load_data(url):
         st.error(f"Failed to load data from GitHub: {e}")
         return None
 
-@st.cache_data
-def load_lottie_file(filepath):
-    with open(filepath, "r") as f:
-        return json.load(f)
-
 # Load the data
 data = load_data(github_repo)
-
-# Load a Lottie animation for better UI
-temperature_animation = load_lottie_file("assets/temperature.json")
 
 if data is not None:
     # Sidebar filters
@@ -46,20 +36,25 @@ if data is not None:
     start_date = st.sidebar.date_input("Start Date", value=data['Timestamp'].min().date())
     end_date = st.sidebar.date_input("End Date", value=data['Timestamp'].max().date())
     view_ac_status = st.sidebar.checkbox("View Only AC Status ON", value=False)
+    view_fan_status = st.sidebar.checkbox("View Only Fan Status ON", value=False)
 
     # Apply filters
     filtered_data = data[(data['Timestamp'].dt.date >= start_date) & (data['Timestamp'].dt.date <= end_date)]
     if view_ac_status:
         filtered_data = filtered_data[filtered_data['AC_Status'] == 1]
+    if view_fan_status:
+        filtered_data = filtered_data[filtered_data['Fan_Status'] == 1]
 
     # Main content
-    st.title("Hourly Temperature Visualization 🌡️")
-    st.markdown(
-        "This app visualizes hourly temperature readings along with AC and fan statuses."
-    )
+    st.title("Hourly Temperature Analysis")
+    st.markdown("""
+    This application provides an in-depth analysis of hourly temperature readings, including interactive visualizations, statistics, and dataset exploration.
+    """)
 
-    # Add Lottie animation
-    st_lottie(temperature_animation, height=200, key="temp")
+    # Statistics
+    st.subheader("Statistics")
+    st.markdown("### General Stats")
+    st.write(filtered_data.describe())
 
     # Line chart for temperature over time
     st.subheader("Temperature Over Time")
@@ -72,15 +67,27 @@ if data is not None:
     plt.xticks(rotation=45)
     st.pyplot(fig)
 
-    # Data table
-    st.subheader("Filtered Data Table")
+    # Dynamic parameters for temperature thresholds
+    st.sidebar.header("Temperature Thresholds")
+    temp_min = st.sidebar.slider("Minimum Temperature", float(filtered_data['Temperature'].min()), float(filtered_data['Temperature'].max()), float(filtered_data['Temperature'].min()))
+    temp_max = st.sidebar.slider("Maximum Temperature", float(filtered_data['Temperature'].min()), float(filtered_data['Temperature'].max()), float(filtered_data['Temperature'].max()))
+
+    filtered_by_temp = filtered_data[(filtered_data['Temperature'] >= temp_min) & (filtered_data['Temperature'] <= temp_max)]
+
+    st.subheader("Filtered by Temperature Threshold")
+    st.write(filtered_by_temp)
+
+    # Dataset exploration
+    st.subheader("Dataset Explorer")
+    st.markdown("Use the table below to explore the full dataset.")
     st.dataframe(filtered_data, use_container_width=True)
 
-    # Summary section
-    st.subheader("Summary")
-    avg_temp = filtered_data['Temperature'].mean()
-    ac_on_count = filtered_data['AC_Status'].sum()
-    st.write(f"Average Temperature: {avg_temp:.2f} °C")
-    st.write(f"Number of Times AC was ON: {ac_on_count}")
+    # Download option
+    st.download_button(
+        label="Download Filtered Dataset",
+        data=filtered_data.to_csv(index=False),
+        file_name="filtered_temperature_data.csv",
+        mime="text/csv"
+    )
 else:
     st.error("Unable to load the dataset. Please check the GitHub repository URL.")
