@@ -1,3 +1,4 @@
+import streamlit as st
 import pandas as pd
 import requests
 from io import StringIO
@@ -16,7 +17,7 @@ def load_existing_data(url):
         data['Timestamp'] = pd.to_datetime(data['Timestamp'])  # Ensure Timestamp is datetime
         return data
     except requests.exceptions.RequestException as e:
-        print(f"Failed to load data from GitHub: {e}")
+        st.error(f"Failed to load data from GitHub: {e}")
         return pd.DataFrame()
 
 def add_row(data, timestamp, temperature, ac_status, fan_status):
@@ -32,23 +33,51 @@ def add_row(data, timestamp, temperature, ac_status, fan_status):
 def save_updated_data(data, file_path):
     """Saves the updated dataset locally."""
     data.to_csv(file_path, index=False)
-    print(f"Updated dataset saved to {file_path}")
+    st.success(f"Updated dataset saved to {file_path}")
 
 # Load existing data
+st.title("Update Dataset")
+st.markdown("Use this tool to manually add rows to the dataset.")
+
 data = load_existing_data(github_repo)
 
-# Input new data row
 if not data.empty:
-    print("Existing dataset loaded. Add a new row.")
-    timestamp = input("Enter Timestamp (YYYY-MM-DD HH:MM:SS): ")
-    temperature = input("Enter Temperature (°C): ")
-    ac_status = input("Enter AC Status (1 for ON, 0 for OFF): ")
-    fan_status = input("Enter Fan Status (1 for ON, 0 for OFF): ")
+    st.success("Dataset loaded successfully!")
 
-    # Add new row
-    data = add_row(data, timestamp, temperature, ac_status, fan_status)
+    # Timestamp selection using date and time input
+    col1, col2 = st.columns(2)
+    with col1:
+        date = st.date_input("Select Date")
+    with col2:
+        time = st.time_input("Select Time")
+    timestamp = pd.Timestamp.combine(date, time)
 
-    # Save updated data locally
-    save_updated_data(data, local_file)
+    # Temperature control using slider
+    temperature = st.slider(
+        "Temperature (°C)", 
+        min_value=-50.0, 
+        max_value=50.0, 
+        value=25.0, 
+        step=0.1
+    )
+
+    # AC and Fan status using toggle buttons
+    col3, col4 = st.columns(2)
+    with col3:
+        ac_status = st.radio("AC Status", options=[1, 0], format_func=lambda x: "ON" if x == 1 else "OFF")
+    with col4:
+        fan_status = st.radio("Fan Status", options=[1, 0], format_func=lambda x: "ON" if x == 1 else "OFF")
+
+    # Add row to the dataset
+    if st.button("Add Row"):
+        try:
+            data = add_row(data, timestamp, temperature, ac_status, fan_status)
+            save_updated_data(data, local_file)
+        except Exception as e:
+            st.error(f"Failed to add row: {e}")
+
+    # Display the updated dataset
+    st.subheader("Updated Dataset Preview")
+    st.dataframe(data.tail(10))  # Show last 10 rows
 else:
-    print("Failed to load existing dataset. No changes made.")
+    st.error("Failed to load the dataset. Please check the GitHub repository URL.")
